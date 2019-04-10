@@ -42,9 +42,6 @@ dependencies {
     //dagger
     implementation "com.google.dagger:dagger:2.16"
     annotationProcessor "com.google.dagger:dagger-compiler:2.16"
-    //moxy
-    annotationProcessor "com.arello-mobile:moxy-compiler:1.5.3"
-    implementation "com.arello-mobile:moxy-android:1.5.3"
     //glide
     implementation "com.github.bumptech.glide:glide:4.9.0"
     annotationProcessor "com.github.bumptech.glide:compiler:4.9.0"

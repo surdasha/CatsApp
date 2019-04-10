@@ -15,14 +15,17 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.arellomobile.mvp.presenter.InjectPresenter;
 import com.bumptech.glide.ListPreloader;
 import com.bumptech.glide.integration.recyclerview.RecyclerViewPreloader;
 
 import java.util.List;
 
+import javax.inject.Inject;
+
 import androidx.annotation.NonNull;
 import androidx.constraintlayout.widget.Group;
+import androidx.lifecycle.ViewModelProvider;
+import androidx.lifecycle.ViewModelProviders;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
@@ -35,7 +38,7 @@ import ru.surdasha.cats.presentation.models.CatUI;
 import ru.surdasha.cats.presentation.ui.BaseFragment;
 import ru.surdasha.cats.presentation.ui.main.MainActivity;
 
-public class AllCatsFragment extends BaseFragment implements AllCatsView, EasyPermissions.PermissionCallbacks {
+public class AllCatsFragment extends BaseFragment implements EasyPermissions.PermissionCallbacks {
     public static final String TAG = AllCatsFragment.class.getSimpleName();
 
     private static final String STATE_POSITION_OFFSET = "STATE_POSITION_OFFSET";
@@ -45,8 +48,6 @@ public class AllCatsFragment extends BaseFragment implements AllCatsView, EasyPe
 
     @BindView(R.id.rvCats)
     RecyclerView rvCats;
-    @InjectPresenter
-    AllCatsPresenter allCatsPresenter;
     AllCatsAdapter allCatsAdapter;
     @BindView(R.id.groupCats)
     Group groupCats;
@@ -68,11 +69,18 @@ public class AllCatsFragment extends BaseFragment implements AllCatsView, EasyPe
     Group groupNext;
     LinearLayoutManager layoutManager;
     Bundle savedInstanceState;
+    @NonNull
+    private AllCatsViewModel viewModel;
+    @Inject
+    public ViewModelProvider.Factory viewModelFactory;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         this.savedInstanceState = savedInstanceState;
+        initViewModel();
+        subscribeToDataStates();
+        subscribeToData();
     }
 
     @Override
@@ -89,15 +97,85 @@ public class AllCatsFragment extends BaseFragment implements AllCatsView, EasyPe
     }
 
     @Override
-    public void onActivityCreated(Bundle savedInstanceState){
+    public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
-        ((MainActivity)getActivity()).getUIComponent().inject(allCatsPresenter);
-        getInitData();
+        ((MainActivity) getActivity()).getUIComponent().inject(this);
+        viewModel.loadAllCats();
         subscribeToDownloadManager();
     }
 
+    private void initViewModel() {
+        viewModel = ViewModelProviders.of(this, viewModelFactory).get(AllCatsViewModel.class);
+    }
+
+    private void subscribeToData() {
+        viewModel.getAllCatsList().observe(this, catUIS -> {
+            if (catUIS.isEmpty()){
+                onEmptyList();
+            }else {
+                onSuccessLoading(catUIS);
+            }
+        });
+        viewModel.getAddedCat().observe(this, catUI -> {
+            onSuccessAddToFavorites();
+        });
+        viewModel.getNextCatsList().observe(this, catUIS -> {
+            if (!catUIS.isEmpty())
+            onSuccessNextLoading(catUIS);
+        });
+    }
+
+    private void subscribeToDataStates() {
+        viewModel.getCatsLoadingAllState().observe(this, state -> {
+            if (state.isLoading()) {
+                onStartFirstLoading();
+            } else {
+                onEndFirstLoading();
+                if (state.isError()) {
+                    onErrorFirstLoading();
+                }
+            }
+        });
+        viewModel.getCatAddingState().observe(this, state -> {
+            if (state.isError()) {
+                onErrorAddToFavorites();
+            }else{
+                onSuccessAddToFavorites();
+            }
+        });
+        viewModel.getCatsRefreshingState().observe(this, state -> {
+            if (state.isLoading()) {
+                onStartRefreshing();
+            } else {
+                onEndRefreshing();
+                if (state.isError()) {
+                    onErrorRefreshing();
+                }
+            }
+        });
+        viewModel.getCatsDownloadImageState().observe(this, state -> {
+            if (state.isSuccess()) {
+                onStartImageDownload();
+            } else {
+                if (state.isError()) {
+                    onErrorImageDownload();
+                }
+            }
+        });
+        viewModel.getCatsLoadingNextState().observe(this, state -> {
+            if (state.isLoading()) {
+                onStartNextLoading();
+            } else {
+                onEndNextLoading();
+                if (state.isError()) {
+                    onErrorNextLoading();
+                }
+            }
+        });
+    }
+
     private void setUpSwipeRefresh() {
-        swipeRefreshLayout.setOnRefreshListener(() -> allCatsPresenter.refreshCats());
+        swipeRefreshLayout.setOnRefreshListener(() -> viewModel.refreshCats());
     }
 
     private void setUpAdapter() {
@@ -106,7 +184,7 @@ public class AllCatsFragment extends BaseFragment implements AllCatsView, EasyPe
             onDownloadClick(catUI);
         });
         allCatsAdapter.setOnLikeClickListener(catUI -> {
-            allCatsPresenter.addToFavorite(catUI);
+            viewModel.addToFavorite(catUI);
         });
         layoutManager = new LinearLayoutManager(getActivity(), RecyclerView.VERTICAL, false);
         rvCats.setLayoutManager(layoutManager);
@@ -128,7 +206,7 @@ public class AllCatsFragment extends BaseFragment implements AllCatsView, EasyPe
             @Override
             public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
                 super.onScrolled(recyclerView, dx, dy);
-                allCatsPresenter.onScrolled(
+                viewModel.onScrolled(
                         layoutManager.getItemCount(),
                         layoutManager.findLastVisibleItemPosition()
                 );
@@ -137,22 +215,16 @@ public class AllCatsFragment extends BaseFragment implements AllCatsView, EasyPe
     }
 
     private void subscribeToDownloadManager() {
-        getActivity().registerReceiver(onDownloadComplete,new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
+        getActivity().registerReceiver(onDownloadComplete, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
     }
-
-    private void getInitData() {
-        allCatsPresenter.getAllCats();
-        allCatsPresenter.subscribeToNextCats();
-    }
-
 
     private void onDownloadClick(CatUI catUI) {
         //save cat to variable due to permissions check
-        allCatsPresenter.setTempImageDownloadCat(catUI);
-        if (allCatsPresenter.checkPermissionsRequired()) {
+        viewModel.setTempImageDownloadCat(catUI);
+        if (viewModel.checkPermissionsRequired()) {
             checkForPermission();
         } else {
-            allCatsPresenter.downloadImage();
+            viewModel.downloadImage();
         }
     }
 
@@ -168,7 +240,6 @@ public class AllCatsFragment extends BaseFragment implements AllCatsView, EasyPe
         }
     };
 
-    @Override
     public void onSuccessLoading(List<CatUI> cats) {
         groupCats.setVisibility(View.VISIBLE);
         allCatsAdapter.refreshData(cats);
@@ -180,7 +251,6 @@ public class AllCatsFragment extends BaseFragment implements AllCatsView, EasyPe
 
     }
 
-    @Override
     public void onStartFirstLoading() {
         groupError.setVisibility(View.GONE);
         groupCats.setVisibility(View.GONE);
@@ -188,92 +258,77 @@ public class AllCatsFragment extends BaseFragment implements AllCatsView, EasyPe
         groupLoading.setVisibility(View.VISIBLE);
     }
 
-    @Override
     public void onEndFirstLoading() {
         groupLoading.setVisibility(View.GONE);
     }
 
-    @Override
     public void onErrorFirstLoading() {
         groupError.setVisibility(View.VISIBLE);
     }
 
-    @Override
     public void onEmptyList() {
         groupEmpty.setVisibility(View.VISIBLE);
     }
 
-    @Override
     public void onErrorAddToFavorites() {
         Toast.makeText(getActivity(), getString(R.string.cant_save_to_favorites), Toast.LENGTH_SHORT).show();
     }
 
-    @Override
     public void onStartImageDownload() {
         Toast.makeText(getActivity(), getString(R.string.image_load_start), Toast.LENGTH_SHORT).show();
     }
 
-    @Override
     public void onSuccessImageDownload() {
         Toast.makeText(getActivity(), getString(R.string.image_load_success), Toast.LENGTH_SHORT).show();
     }
 
-    @Override
     public void onErrorImageDownload() {
         Toast.makeText(getActivity(), getString(R.string.error_load_image), Toast.LENGTH_SHORT).show();
     }
 
-    @Override
     public void onStartRefreshing() {
         swipeRefreshLayout.setRefreshing(true);
     }
 
-    @Override
     public void onEndRefreshing() {
         swipeRefreshLayout.setRefreshing(false);
     }
 
-    @Override
     public void onErrorRefreshing() {
         Toast.makeText(getActivity(), getString(R.string.error_refresh_cats), Toast.LENGTH_SHORT).show();
     }
 
-    @Override
     public void onSuccessNextLoading(List<CatUI> cats) {
         allCatsAdapter.addData(cats);
     }
 
-    @Override
     public void onStartNextLoading() {
         groupNext.setVisibility(View.VISIBLE);
         swipeRefreshLayout.setEnabled(false);
     }
 
-    @Override
     public void onEndNextLoading() {
         groupNext.setVisibility(View.GONE);
         swipeRefreshLayout.setEnabled(true);
     }
 
-    @Override
     public void onErrorNextLoading() {
         Toast.makeText(getActivity(), getString(R.string.error_get_next_cats), Toast.LENGTH_SHORT).show();
     }
 
-    @Override
     public void onSuccessAddToFavorites() {
         Toast.makeText(getActivity(), getString(R.string.success_saving_favorites), Toast.LENGTH_SHORT).show();
     }
 
     @OnClick(R.id.ibRetry)
     public void onRetry() {
-        allCatsPresenter.getAllCats();
+        viewModel.loadAllCats();
     }
 
 
     public void checkForPermission() {
         if (isPermissionGranted()) {
-            allCatsPresenter.downloadImage();
+            viewModel.downloadImage();
         } else {
             requestRuntimePermission();
         }
@@ -291,7 +346,7 @@ public class AllCatsFragment extends BaseFragment implements AllCatsView, EasyPe
     @Override
     public void onPermissionsGranted(int requestCode, @NonNull List<String> perms) {
         if (isPermissionGranted()) {
-            allCatsPresenter.downloadImage();
+            viewModel.downloadImage();
         } else {
             requestRuntimePermission();
         }
@@ -326,6 +381,5 @@ public class AllCatsFragment extends BaseFragment implements AllCatsView, EasyPe
     public void onDestroyView() {
         super.onDestroyView();
         getActivity().unregisterReceiver(onDownloadComplete);
-        allCatsPresenter.unsubscribe();
     }
 }

@@ -47,7 +47,9 @@ public class MainActivity extends BaseActivity {
     private void navigateAllCats() {
         Fragment fragment = getFragmentByTag(AllCatsFragment.TAG);
         if (fragment == null){
-            showFragmentWithTag(new AllCatsFragment(), AllCatsFragment.TAG, true);
+            AllCatsFragment baseFragment = new AllCatsFragment();
+            getUIComponent().inject(baseFragment);
+            showFragmentWithTag(baseFragment, AllCatsFragment.TAG, true);
         }else{
             showFragmentWithTag(fragment, AllCatsFragment.TAG, false);
         }
@@ -56,7 +58,9 @@ public class MainActivity extends BaseActivity {
     private void navigateFavorites() {
         Fragment fragment = getFragmentByTag(FavoriteCatsFragment.TAG);
         if (fragment == null){
-            showFragmentWithTag(new FavoriteCatsFragment(), FavoriteCatsFragment.TAG, true);
+            FavoriteCatsFragment baseFragment = new FavoriteCatsFragment();
+            getUIComponent().inject(baseFragment);
+            showFragmentWithTag(baseFragment, FavoriteCatsFragment.TAG, true);
         }else{
             showFragmentWithTag(fragment, FavoriteCatsFragment.TAG, false);
         }
@@ -70,7 +74,9 @@ public class MainActivity extends BaseActivity {
         navigation.setOnNavigationItemSelectedListener(mOnNavigationItemSelectedListener);
         getUiComponent().inject(this);
         if (savedInstanceState == null) {
-            showFragmentWithTag(new AllCatsFragment(), AllCatsFragment.class.getSimpleName(), true);
+            AllCatsFragment baseFragment = new AllCatsFragment();
+            getUIComponent().inject(baseFragment);
+            showFragmentWithTag(baseFragment, AllCatsFragment.class.getSimpleName(), true);
         }
     }
 

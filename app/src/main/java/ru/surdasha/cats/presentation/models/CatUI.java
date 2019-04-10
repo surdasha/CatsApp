@@ -72,7 +72,7 @@ public class CatUI {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         CatUI catUI = (CatUI) o;
-        return Id == catUI.Id;
+        return serverId.equals(catUI.getServerId());
     }
 
     public long getTempDownloadId() {

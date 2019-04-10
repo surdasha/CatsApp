@@ -1,7 +1,6 @@
 package ru.surdasha.cats.di.components;
 
 import dagger.Component;
-import ru.surdasha.cats.di.ViewModelModule;
 import ru.surdasha.cats.di.modules.AndroidModule;
 import ru.surdasha.cats.di.modules.ContextModule;
 import ru.surdasha.cats.di.modules.DataModule;

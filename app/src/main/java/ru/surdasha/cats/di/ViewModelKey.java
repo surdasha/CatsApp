@@ -7,7 +7,6 @@ import java.lang.annotation.Target;
 
 import androidx.lifecycle.ViewModel;
 import dagger.MapKey;
-import kotlin.annotation.AnnotationTarget;
 
 @Target({ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)

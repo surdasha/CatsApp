@@ -3,12 +3,10 @@ package ru.surdasha.cats.di;
 import java.util.Map;
 
 import javax.inject.Inject;
-import javax.inject.Provider;
 
 import androidx.annotation.NonNull;
 import androidx.lifecycle.ViewModel;
 import androidx.lifecycle.ViewModelProvider;
-import ru.surdasha.cats.di.scopes.PerApplication;
 
 public class ViewModelFactory implements ViewModelProvider.Factory {
 

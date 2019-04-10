@@ -2,12 +2,12 @@ package ru.surdasha.cats.presentation.ui;
 
 import android.view.View;
 
+import androidx.fragment.app.Fragment;
 import butterknife.ButterKnife;
 import butterknife.Unbinder;
-import ru.surdasha.cats.presentation.misc.MVPMoxyFragment;
 
 
-public class BaseFragment extends MVPMoxyFragment {
+public class BaseFragment extends Fragment {
     private Unbinder unbinder;
 
     public void bindBaseUI(View view) {

@@ -1,11 +1,9 @@
 package ru.surdasha.cats.presentation.ui.favorites;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import javax.inject.Inject;
 
-import androidx.annotation.NonNull;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
 import io.reactivex.android.schedulers.AndroidSchedulers;
@@ -16,62 +14,72 @@ import ru.surdasha.cats.domain.usecases.DeleteCatUseCase;
 import ru.surdasha.cats.domain.usecases.GetFavoriteCatsUseCase;
 import ru.surdasha.cats.presentation.mappers.CatUIMapper;
 import ru.surdasha.cats.presentation.models.CatUI;
+import ru.surdasha.cats.presentation.models.State;
 
 public class FavoriteCatsViewModel extends ViewModel {
-    @NonNull
     private final CompositeDisposable compositeDisposable = new CompositeDisposable();
-    @Inject
-    GetFavoriteCatsUseCase getFavoriteCatsUseCase;
-    @Inject
-    DeleteCatUseCase deleteCatUseCase;
-    @Inject
-    CatUIMapper catUIMapper;
-    private final MutableLiveData<List<CatUI>> cats = new MutableLiveData<>();
-    private final MutableLiveData<Throwable> loadError = new MutableLiveData<>();
-    private final MutableLiveData<Boolean> loading = new MutableLiveData<>();
+    private final GetFavoriteCatsUseCase getFavoriteCatsUseCase;
+    private final DeleteCatUseCase deleteCatUseCase;
+    private final CatUIMapper catUIMapper;
+
+    private final MutableLiveData<List<CatUI>> catsList = new MutableLiveData<>();
+    private final MutableLiveData<CatUI> deletedCat = new MutableLiveData<>();
+    private final MutableLiveData<State> catsDeletingState = new MutableLiveData<>();
+    private final MutableLiveData<State> catsLoadingState = new MutableLiveData<>();
 
     @Inject
-    public FavoriteCatsViewModel() {
+    public FavoriteCatsViewModel(CatUIMapper catUIMapper, DeleteCatUseCase deleteCatUseCase, GetFavoriteCatsUseCase getFavoriteCatsUseCase) {
+        this.catUIMapper = catUIMapper;
+        this.deleteCatUseCase = deleteCatUseCase;
+        this.getFavoriteCatsUseCase = getFavoriteCatsUseCase;
     }
 
-    public void getCats(){
-        loading.setValue(true);
+    public MutableLiveData<State> getCatsLoadingState() {
+        return catsLoadingState;
+    }
+    public MutableLiveData<State> getCatsDeletingState() {
+        return catsDeletingState;
+    }
+    public MutableLiveData<List<CatUI>> getCatsList() {
+        return catsList;
+    }
+    public MutableLiveData<CatUI> getDeleteCat() {
+        return deletedCat;
+    }
+
+    public void loadFavoriteCats(){
+        catsLoadingState.setValue(new State().loading());
         Disposable disposable = getFavoriteCatsUseCase.getFavoriteCats()
                 .map(cats -> catUIMapper.domainToUI(cats))
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(cats -> {
-                    loading.setValue(false);
-                    this.cats.setValue(cats);
+                    this.catsLoadingState.setValue(new State().success());
+                    catsList.setValue(cats);
                 },throwable -> {
-                    loading.setValue(false);
-                    loadError.setValue(throwable);
+                    catsLoadingState.setValue(new State().error(throwable));
                 }, () -> {
-                    loading.setValue(false);
-                    this.cats.setValue(new ArrayList<>());
+                    catsLoadingState.setValue(new State().success());
                 });
         compositeDisposable.add(disposable);
     }
 
-    public MutableLiveData<List<CatUI>> getCatsObservable(){
-        return cats;
-    }
-    public MutableLiveData<Throwable> getLoadError() {
-        return loadError;
-    }
-
-    public MutableLiveData<Boolean> getLoading() {
-        return loading;
-    }
-    public void deleteFromFavorite(CatUI catUI){
+    public void deleteFavoriteCat(CatUI catUI){
+        catsDeletingState.setValue(new State().loading());
         deleteCatUseCase.deleteCat(catUIMapper.uiToDomain(catUI))
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(() -> {
-
+                    catsDeletingState.setValue(new State().success());
+                    deletedCat.setValue(catUI);
                 },throwable -> {
-
+                    catsDeletingState.setValue(new State().error(throwable));
                 });
+    }
+
+    protected void onCleared(){
+        super.onCleared();
+        compositeDisposable.clear();
     }
 
 }
