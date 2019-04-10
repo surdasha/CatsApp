@@ -10,12 +10,17 @@ import com.arellomobile.mvp.presenter.InjectPresenter;
 
 import java.util.List;
 
+import javax.inject.Inject;
+
 import androidx.constraintlayout.widget.Group;
+import androidx.lifecycle.ViewModelProvider;
+import androidx.lifecycle.ViewModelProviders;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import butterknife.BindView;
 import butterknife.OnClick;
 import ru.surdasha.cats.R;
+import ru.surdasha.cats.di.ViewModelFactory;
 import ru.surdasha.cats.presentation.models.CatUI;
 import ru.surdasha.cats.presentation.ui.BaseFragment;
 import ru.surdasha.cats.presentation.ui.main.MainActivity;
@@ -36,6 +41,9 @@ public class FavoriteCatsFragment extends BaseFragment implements FavoriteCatsVi
     @InjectPresenter
     FavoriteCatsPresenter favoriteCatsPresenter;
     LinearLayoutManager layoutManager;
+    private FavoriteCatsViewModel viewModel;
+    @Inject
+    public ViewModelProvider.Factory viewModelFactory;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -55,8 +63,29 @@ public class FavoriteCatsFragment extends BaseFragment implements FavoriteCatsVi
     @Override
     public void onActivityCreated(Bundle savedInstanceState){
         super.onActivityCreated(savedInstanceState);
-        ((MainActivity)getActivity()).getUIComponent().inject(favoriteCatsPresenter);
-        favoriteCatsPresenter.getCats();
+//        ((MainActivity)getActivity()).getUIComponent().inject(favoriteCatsPresenter);
+        ((MainActivity)getActivity()).getUIComponent().inject(this);
+//        favoriteCatsPresenter.getCats();
+        viewModel = ViewModelProviders.of(this, viewModelFactory).get(FavoriteCatsViewModel.class);
+        ((MainActivity)getActivity()).getUIComponent().inject(viewModel);
+        viewModel.getCats();
+        viewModel.getCatsObservable().observe(this, catUIS -> {
+            if (catUIS.isEmpty()){
+                onEmptyList();
+            }else{
+                onShowCats(catUIS);
+            }
+        });
+        viewModel.getLoadError().observe(this, throwable -> {
+            onShowErrorLoading();
+        });
+        viewModel.getLoading().observe(this, isLoading -> {
+            if (isLoading){
+                onShowLoading();
+            }else{
+                onHideLoad();
+            }
+        });
     }
 
     private void setUpAdapter() {
